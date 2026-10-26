@@ -1,4 +1,5 @@
-# COMP9001 - Blue Mountains Handbook
+# USYD COMP9001 Final Project - Blue Mountains Handbook
+## Personalised Bushwalking & Local Guide
 
 #### GitHub Repository Link: https://github.com/yuhan0113/comp9001-blue-mountains-handbook.git
 
