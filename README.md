@@ -1,15 +1,19 @@
 # USYD COMP9001 Final Project - Blue Mountains Handbook
 ## Personalised Bushwalking & Local Guide
 
-#### GitHub Repository Link: https://github.com/yuhan0113/comp9001-blue-mountains-handbook.git
+**Find a walk that fits your day.**
 
-#### Student Name: Yu-Han CHANG
+Repository: https://github.com/yuhan0113/comp9001-blue-mountains-handbook
 
-#### Student ID: 540 140 295
+Student Name: Yu-Han CHANG
 
-#### Tutorial Activity 01 (Niousha Nazemi)
+Student ID: 540 140 295
+
+Tutorial Activity 01 (Niousha Nazemi)
 
 ## Run the program
+
+Use Python 3.9 or later. No third-party packages, installation or internet connection are needed to run the program.
 
 From this project folder:
 
@@ -17,67 +21,105 @@ From this project folder:
 python3 main.py
 ```
 
-The program provides an interactive guide to selected Blue Mountains locations and bushwalking tracks. Users can explore local information, browse available walks and receive personalised walk recommendations based on their preferences.
+The terminal menu lets you:
 
-No third-party Python packages are required.
+1. Explore Katoomba, Blackheath and Wentworth Falls, including postcodes, short history notes and nearby walks.
+2. Browse five walks, either together or by location.
+3. Enter preferences and receive up to three explained recommendations with preparation notes.
+4. Exit. Ctrl+C or end-of-input also exits cleanly.
+
+Choose menu option `3` and try: `300` minutes, `10` km, grade `3`, `car`, `forest`, `active`, then `yes` for basic gear. Grand Canyon track ranks first with 100/100 preference points. Choose `yes` at the final prompt to save results, or `no` to return to the menu.
+
+The CSV files are found relative to `main.py`, so running the script from another working directory also works.
 
 ## Which files do what?
 
-- `main.py`: entry point; displays the main menu and coordinates the program.
-- `trails.csv`: stores bushwalking trail information used by the program.
-- `locations.csv`: stores information about selected Blue Mountains towns and locations.
-- `tests.py`: contains developer tests for recommendation and scoring functions.
-- `README.md`: explains how to run and understand the project.
+- `main.py`: menu, input validation, readable output, preparation questions and report saving.
+- `data_loader.py`: reads CSV files, converts numbers and booleans, validates data and location references.
+- `recommendations.py`: hard-limit filtering, preference scoring, sorting and preparation suggestions.
+- `trails.csv`: five walks with distance, duration, grade, route type, tags, access notes and source URLs.
+- `locations.csv`: three towns with postcodes, descriptions, history notes and source URLs.
+- `tests.py`: standard-library `unittest` checks covering logic, file handling and terminal interactions.
+- `saved_recommendations.txt`: created only when you choose to save; subsequent sessions append instead of overwriting. This personal output is ignored by Git.
 
-Additional Python modules may be added as the program is developed.
+## How recommendations work
 
-## Main Features
+First, exclude any walk exceeding the user's maximum walking time, distance or track grade. If the user chooses public transport, also exclude records without public transport support in this small catalogue. Limits are inclusive: a 60-minute walk fits a 60-minute limit. The program never relaxes a limit silently.
 
-The program allows users to:
+Then score each eligible walk:
 
-- Explore selected Blue Mountains towns and locations.
-- View information such as postcode, local history and nearby walks.
-- Browse available bushwalking tracks.
-- Enter personal preferences such as available time, distance, difficulty and scenery.
-- Consider transport and preparation requirements.
-- Receive personalised bushwalking recommendations.
-- View suggested gear and preparation for recommended walks.
+- 50 points for meeting all four hard limits.
+- 30 points if the scenery matches, or the user selected `any`.
+- 20 points if the mood matches, or the user selected `any`.
 
-## Advanced Topics
+Sort by descending score, then ascending duration, then alphabetical name. Display the first three. The score is a transparent preference heuristic, not a probability, safety rating or claim that a track is currently open. All eligible walks get at least 50 points. Selecting `any` gives equal points to every walk for that factor.
 
-The project is designed to demonstrate advanced COMP9001 topics including:
+If there are no matches, explain why each walk was excluded and return to the menu. The user decides whether to change their preferences.
 
-- File I/O for loading trail and location data.
-- Program testing for recommendation and scoring functions.
+Basic gear readiness changes preparation messages, not the score. A user without basic gear is told to prepare before undertaking any walk. Longer, higher-grade and one-way walks receive additional notes.
 
-Other advanced concepts may also be used where appropriate during development.
+## Data and modelling decisions
 
-## Run the checks
+Trail distances, route types, grades and suggested times were checked against the linked NSW National Parks pages on **27 October 2026**. The stored duration uses the upper end of each published time range; this is an estimate, not a guaranteed completion time. Breaks, travel, delays and extra return journeys are excluded.
 
-From this project folder:
+- [Three Sisters walk](https://www.nationalparks.nsw.gov.au/things-to-do/walking-tracks/three-sisters-walk): 0.8 km return, 45 minutes, grade 1.
+- [Fairfax Heritage walking track](https://www.nationalparks.nsw.gov.au/things-to-do/walking-tracks/fairfax-heritage-walking-track): 1.8 km **one-way**, 45 minutes, grade 1. Arrange pickup or allow additional time and distance to return; the program does not calculate a return itinerary.
+- [Princes Rock walking track](https://www.nationalparks.nsw.gov.au/things-to-do/walking-tracks/princes-rock-walking-track): 1.8 km return, 60 minutes, grade 3.
+- [Wentworth Falls track](https://www.nationalparks.nsw.gov.au/things-to-do/walking-tracks/wentworth-falls-track): 1.4 km return, 60 minutes, grade 3.
+- [Grand Canyon track](https://www.nationalparks.nsw.gov.au/things-to-do/walking-tracks/grand-canyon-track): 6.3 km loop, 240 minutes, grade 3.
+
+Scenery and mood tags are project-authored categories, not official NPWS classifications. Track grade is retained separately: a longer grade-3 walk can still require substantial effort.
+
+Transport is deliberately simplified. Only the Three Sisters record is enabled for public transport planning, via Katoomba and onward access to Echo Point. A `no` value means access is **not modelled in this catalogue**, not that public transport is impossible. No timetable, transfer distance or fare is calculated. Car selection also requires the user to arrange suitable trailhead access and any pickup. Check [Transport for NSW Trip Planner](https://transportnsw.info/trip) for actual journeys.
+
+Short history summaries are paraphrased from [Blue Mountains Local Studies](https://bluemlocalstudies.wordpress.com/2016/04/26/katoomba-street-history-walk/), [Powerhouse Collection](https://collection.powerhouse.com.au/object/31124), and the [Wentworth Falls Chamber of Commerce](https://www.wentworthfalls.org.au/history-of-wentworth-falls/). Each town's source is also in its CSV row.
+
+This is an offline educational guide. It does not check current closures, weather, fire conditions, personal fitness or accessibility requirements. Consult the official track pages and [NPWS alerts](https://www.nationalparks.nsw.gov.au/alerts/alerts-list) before walking. A grade alone does not establish wheelchair or pram access. Grand Canyon has specific heavy-rain advice on its official page.
+
+## Editing the data
+
+Open the CSV files in a text editor or spreadsheet editor and retain the exact header order. Quote any cell containing a comma. Use unique, non-empty IDs and ensure each trail's `location_id` exists in `locations.csv`.
+
+- `distance_km`: a positive finite number.
+- `minutes`: a positive whole number.
+- `grade`: a whole number from 1 to 5.
+- `route`: `return`, `loop` or `one-way`.
+- `scenery`: one or more of `views`, `waterfalls`, `forest`, separated with `|`.
+- `mood`: `relaxed`, `exploring` or `active`.
+- `public_transport`: `yes` or `no`.
+- Postcodes: four digits; all text fields must be populated.
+
+Missing files, malformed rows, invalid values, duplicate IDs and unknown locations produce a startup error rather than partial recommendations. Correct the data and restart. Saving errors are reported without closing the menu.
+
+## Tests
 
 ```sh
 python3 tests.py
 ```
 
-Tests display their results in the terminal.
+Alternatively:
 
-The tests will focus on areas such as recommendation scoring, preference handling, invalid inputs and expected program behaviour.
+```sh
+python3 -m unittest discover -v
+```
 
-## Suggested reading order
+The 23 tests include exact filter boundaries, deterministic ties, matching and non-matching preferences, no results, transport restrictions, invalid numeric input (including infinity and NaN), corrupt CSV records, missing files, report append/read-back, save failures, clean exits and a complete menu session launched from a different directory. Test files and saved reports use temporary folders; the bundled catalogue is not modified.
 
-1. Start with `main()` in `main.py` to understand the overall program flow and menu.
-2. Follow the location and trail loading functions to see how external data is read.
-3. Read the recommendation and scoring functions to understand how user preferences affect trail rankings.
-4. Review the gear recommendation logic to see how preparation suggestions are generated.
-5. Run `tests.py` to check important program behaviours.
+## COMP9001 concepts and review guide
 
-## Project Scope
+The implementation uses functions, loops, conditionals, strings, lists, dictionaries, sets, sorting and exceptions. File I/O and program testing are the two planned advanced topics. There is no database, web application, external API or machine learning dependency.
 
-Blue Mountains Handbook is a personalised bushwalking and local guide focused on selected locations within the Blue Mountains.
+Suggested reading order:
 
-The program does not provide real-time weather, track closure, emergency or safety information. Recommendations are based on stored trail characteristics and user preferences rather than live environmental conditions.
+1. Follow `main()` in `main.py` through one menu session.
+2. Read `load_catalogue()` and compare a raw CSV row with the converted dictionary.
+3. Trace `exclusion_reasons()`, `score_trail()` and `recommend()` using the example above.
+4. Change one preference and predict which walks disappear or change score.
+5. Read `preparation()` and `save_report()`; save two sessions and inspect the output.
+6. Run `tests.py`, then add a test when changing a scoring rule or adding a walk.
 
-Users should check official and current information before undertaking any bushwalk.
+Keep future changes within the intended 8–12 hour project scope: first review the data, wording and scoring weights together. A GUI, live routing and large datasets are outside the current scope. No claim is made that 8–12 hours of student work has already occurred.
 
-The code may be prepared with AI assistance where permitted. All submitted work should be understood and reviewed by the student in accordance with COMP9001 AI-use and disclosure requirements.
+## AI assistance and submission review
+
+This implementation, tests, data summaries and documentation were prepared with AI assistance. The student should review and understand each part, verify the course's current assessment and AI-disclosure requirements, and record their own modifications before submission. The final-project rubric was not available in this repository, so this implementation follows the approved README scope and is not a claim of rubric compliance. Any required report, declaration or demonstration should reflect the student's actual work and understanding.
