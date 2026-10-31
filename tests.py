@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from data_loader import BASE_DIR, load_catalogue
 import main
-from recommendations import exclusion_reasons, preparation, recommend
+from recommendations import exclusion_reasons, preparation, recommend, trade_offs
 
 
 def preferences(**changes):
@@ -25,21 +25,22 @@ def preferences(**changes):
 class RecommendationTests(unittest.TestCase):
     def setUp(self):
         self.locations, self.trails = load_catalogue()
+        self.by_id = {trail['id']: trail for trail in self.trails}
 
     def test_catalogue_loads_typed_data(self):
-        self.assertEqual(len(self.locations), 3)
-        self.assertEqual(len(self.trails), 5)
+        self.assertEqual(len(self.locations), 5)
+        self.assertEqual(len(self.trails), 11)
         self.assertIsInstance(self.trails[0]['public_transport'], bool)
 
     def test_best_match_and_explanation(self):
         results = recommend(self.trails, preferences())
-        self.assertEqual(results[0]['trail']['id'], 'grand-canyon')
+        self.assertEqual(results[0]['trail']['id'], 'gordon-katoomba')
         self.assertEqual(results[0]['score'], 100)
-        self.assertEqual(len(results[0]['reasons']), 3)
+        self.assertEqual(len(results[0]['reasons']), 4)
         self.assertEqual(results[-1]['score'], 50)
 
     def test_each_hard_limit_excludes(self):
-        trail = self.trails[-1]
+        trail = self.by_id['grand-canyon']
         for changes, reason in [({'max_minutes': 239}, 'time'),
                                 ({'max_distance': 6.2}, 'distance'),
                                 ({'max_grade': 2}, 'grade'),
@@ -49,7 +50,7 @@ class RecommendationTests(unittest.TestCase):
                 self.assertIn(reason, ' '.join(exclusion_reasons(trail, preferences(**changes))))
 
     def test_limits_are_inclusive(self):
-        results = recommend([self.trails[-1]], preferences(max_minutes=240, max_distance=6.3))
+        results = recommend([self.by_id['grand-canyon']], preferences(max_minutes=240, max_distance=6.3))
         self.assertEqual(len(results), 1)
 
     def test_no_matches(self):
@@ -57,7 +58,8 @@ class RecommendationTests(unittest.TestCase):
 
     def test_public_transport(self):
         results = recommend(self.trails, preferences(transport='public'))
-        self.assertEqual([r['trail']['id'] for r in results], ['three-sisters'])
+        self.assertEqual({r['trail']['id'] for r in results},
+                         {'three-sisters', 'south-lawson', 'gordon-katoomba'})
 
     def test_any_preferences_and_ties(self):
         results = recommend(list(reversed(self.trails)), preferences(scenery='any', mood='any'))
@@ -67,16 +69,34 @@ class RecommendationTests(unittest.TestCase):
     def test_invalid_preferences(self):
         for changes in ({'max_minutes': float('nan')}, {'max_distance': float('inf')},
                         {'max_minutes': 0}, {'max_grade': 6}, {'scenery': 'snow'},
-                        {'mood': 'sleepy'}, {'transport': 'helicopter'}):
+                        {'mood': 'sleepy'}, {'transport': 'helicopter'}, {'route': 'flight'}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 recommend(self.trails, preferences(**changes))
 
     def test_preparation(self):
-        notes = ' '.join(preparation(self.trails[-1], False))
+        notes = ' '.join(preparation(self.by_id['grand-canyon'], False))
         self.assertIn('heavy rain', notes)
         self.assertIn('missing basic gear', notes)
         self.assertIn('offline map', notes)
         self.assertIn('One-way', ' '.join(preparation(self.trails[1], True)))
+
+    def test_route_preference_changes_ranking_without_exclusion(self):
+        chosen = [self.by_id['grand-canyon'], self.by_id['gordon-katoomba']]
+        results = recommend(chosen, preferences(route='one-way'))
+        self.assertEqual([r['score'] for r in results], [100, 90])
+        self.assertEqual(results[0]['trail']['id'], 'gordon-katoomba')
+        self.assertEqual(len(results), 2)
+        self.assertIn('preferred route', ' '.join(trade_offs(chosen[0], preferences(route='one-way'))))
+
+    def test_south_lawson_profile(self):
+        results = recommend(self.trails, preferences(max_minutes=120, max_distance=4,
+                            max_grade=2, scenery='waterfalls', mood='exploring', route='loop'))
+        self.assertEqual(results[0]['trail']['id'], 'south-lawson')
+        self.assertEqual(results[0]['score'], 100)
+
+    def test_every_town_has_walks(self):
+        self.assertEqual({t['location_id'] for t in self.trails},
+                         {location['id'] for location in self.locations})
 
     def test_does_not_mutate_catalogue(self):
         before = repr(self.trails)
@@ -156,8 +176,8 @@ class InteractionTests(unittest.TestCase):
             self.assertEqual(main.choose('Ready?', ['yes', 'no']), 'yes')
 
     def test_full_menu_from_other_directory(self):
-        answers = '\n'.join(['1', '2', 'all', '3', '300', '10', '3',
-                             'car', 'forest', 'active', 'yes', 'no', '4']) + '\n'
+        answers = '\n'.join(['3', 'all', '2', 'all', '1', '0', '1', '300', '10', '3',
+                             'car', 'forest', 'active', 'loop', 'yes', 'no', '4']) + '\n'
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run([sys.executable, str(BASE_DIR / 'main.py')],
                                     input=answers, text=True, capture_output=True,
@@ -169,14 +189,14 @@ class InteractionTests(unittest.TestCase):
         self.assertIn('Goodbye!', result.stdout)
 
     def test_no_match_flow(self):
-        answers = ['3', '1', '1', '1', 'public', 'any', 'any', 'no', '4']
+        answers = ['1', '1', '1', '1', 'public', 'any', 'any', 'any', 'no', '4']
         output = io.StringIO()
         with patch('builtins.input', side_effect=answers), contextlib.redirect_stdout(output):
             self.assertEqual(main.main(), 0)
         self.assertIn('No walks match', output.getvalue())
 
     def test_save_flow_and_error_message(self):
-        answers = ['45', '1', '1', 'public', 'views', 'relaxed', 'no', 'yes']
+        answers = ['45', '1', '1', 'public', 'views', 'relaxed', 'any', 'no', 'yes']
         output = io.StringIO()
         with patch('builtins.input', side_effect=answers), \
                 patch('main.save_report', side_effect=PermissionError('read-only')), \
@@ -189,6 +209,25 @@ class InteractionTests(unittest.TestCase):
         for error in (EOFError, KeyboardInterrupt):
             with patch('builtins.input', side_effect=error), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(main.main(), 0)
+
+    def test_numbered_choices(self):
+        with patch('builtins.input', return_value='2'), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main.choose('Transport', ['car', 'public']), 'public')
+
+    def test_browse_filter_and_back(self):
+        locations, trails = load_catalogue()
+        output = io.StringIO()
+        with patch('builtins.input', side_effect=['lawson', '1', '0']), contextlib.redirect_stdout(output):
+            main.browse(locations, trails)
+        self.assertIn('South Lawson', output.getvalue())
+        self.assertNotIn('Grand Canyon', output.getvalue())
+
+    def test_explore_one_town(self):
+        output = io.StringIO()
+        with patch('builtins.input', return_value='leura'), contextlib.redirect_stdout(output):
+            main.explore(*load_catalogue())
+        self.assertIn('Leura | NSW 2780', output.getvalue())
+        self.assertNotIn('Lawson | NSW', output.getvalue())
 
     def test_startup_error(self):
         output = io.StringIO()

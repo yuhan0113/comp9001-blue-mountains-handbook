@@ -7,6 +7,8 @@ def validate_preferences(preferences):
         positive_number(preferences[key])
     if preferences['max_grade'] not in range(1, 6):
         raise ValueError('Maximum grade must be 1 to 5')
+    if preferences.get('route', 'any') not in ('any', 'loop', 'return', 'one-way'):
+        raise ValueError('Unknown route preference')
     if preferences['transport'] not in ('car', 'public'):
         raise ValueError('Transport must be car or public')
     if preferences['scenery'] not in SCENERY + ('any',):
@@ -30,16 +32,42 @@ def exclusion_reasons(trail, preferences):
 
 
 def score_trail(trail, preferences):
-    """Eligible walks receive 50 base points plus scenery (30) and mood (20)."""
-    score = 50
-    reasons = ['Within your time, distance, grade and transport limits (+50)']
-    if preferences['scenery'] == 'any' or preferences['scenery'] in trail['scenery']:
+    """40 points for eligibility, then scenery (30), mood (20) and route (10)."""
+    score = 40
+    reasons = ['Fits your walking time, distance, grade and access limits (+40)']
+    if preferences['scenery'] == 'any':
         score += 30
-        reasons.append('Scenery matches, or no scenery preference (+30)')
-    if preferences['mood'] == 'any' or preferences['mood'] == trail['mood']:
+        reasons.append('No scenery preference; equal scenery points (+30)')
+    elif preferences['scenery'] in trail['scenery']:
+        score += 30
+        reasons.append(f"Matches your {preferences['scenery']} preference (+30)")
+    if preferences['mood'] == 'any':
         score += 20
-        reasons.append('Mood matches, or no mood preference (+20)')
+        reasons.append('No mood preference; equal mood points (+20)')
+    elif preferences['mood'] == trail['mood']:
+        score += 20
+        reasons.append(f"Matches your {trail['mood']} mood (+20)")
+    route = preferences.get('route', 'any')
+    if route == 'any' or route == trail['route']:
+        score += 10
+        reasons.append('Route matches, or no route preference (+10)')
     return score, reasons
+
+
+def trade_offs(trail, preferences):
+    """Explain unmet soft preferences without excluding the walk."""
+    notes = []
+    if preferences['scenery'] != 'any' and preferences['scenery'] not in trail['scenery']:
+        notes.append(f"Does not have the requested {preferences['scenery']} scenery tag.")
+    if preferences['mood'] != 'any' and preferences['mood'] != trail['mood']:
+        notes.append(f"Tagged {trail['mood']}, rather than your {preferences['mood']} mood.")
+    if preferences.get('route', 'any') not in ('any', trail['route']):
+        notes.append(f"This is a {trail['route']} walk, not your preferred route style.")
+    if preferences['transport'] == 'public':
+        notes.append('Station and bus-stop transfers add walking and travel beyond your limits.')
+    if trail['route'] == 'one-way':
+        notes.append('The stated distance and time do not include a return journey.')
+    return notes
 
 
 def recommend(trails, preferences):
@@ -56,7 +84,7 @@ def recommend(trails, preferences):
 
 def preparation(trail, ready):
     notes = ['Bring drinking water, sun protection, suitable shoes and weather layers.',
-             'Check official alerts and weather; tell someone your plans.']
+             'Check NPWS and council track notices and weather; tell someone your plans.']
     if trail['minutes'] >= 180:
         notes.append('Allow a full walking session; pack food and an offline map.')
     if trail['grade'] >= 3:
@@ -65,6 +93,10 @@ def preparation(trail, ready):
         notes.append('One-way figures only: arrange pickup or allow extra time and distance to return.')
     if trail['id'] == 'grand-canyon':
         notes.append('Do not enter the canyon before, during or after heavy rain; check NPWS advice.')
+    if trail['id'] == 'lockley-pylon':
+        notes.append('Exposed terrain: check the official navigation and equipment advice.')
+    if trail['id'] == 'porters-pass':
+        notes.append('Steep cliff passes and slippery ledges: check council notices and route notes.')
     if not ready:
         notes.append('You reported missing basic gear: prepare before undertaking any walk.')
     return notes
