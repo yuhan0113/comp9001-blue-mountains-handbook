@@ -6,10 +6,13 @@ from pathlib import Path
 from data_loader import BASE_DIR, load_catalogue, positive_number
 from recommendations import preparation, recommend, trade_offs, time_alternatives
 
-NOTICE = ('Offline study guide: track status is unknown. Check current NPWS and council notices, '
-          'weather and access before walking. Times exclude travel, breaks and delays.')
-ALERTS = 'https://www.nationalparks.nsw.gov.au/alerts/alerts-list'
-COUNCIL = 'https://www.bmcc.nsw.gov.au/'
+NOTICE = (
+    'Offline data. Track conditions may subject to weather. '
+    'Check current NPWS alerts, Blue Mountains City Council notices. '
+)
+
+NPWS_ALERTS = 'https://www.nationalparks.nsw.gov.au/alerts/alerts-list'
+BMCC = 'https://www.bmcc.nsw.gov.au/'
 
 
 WIDTH = 76
@@ -94,7 +97,7 @@ def trail_text(trail):
 def explore(locations, trails):
     heading('EXPLORE LOCAL TOWNS IN THE BLUE MOUNTAINS')
     options = ['all'] + [location['id'] for location in locations] + ['back']
-    selected = choose('Choose an area', options)
+    selected = choose('Choose your destination', options)
     for location in locations:
         if selected not in ('all', location['id']):
             continue
@@ -192,7 +195,7 @@ def collect_preferences():
 
 def short_results(results, preferences):
     """A compact screen view; the saved report retains full source notes."""
-    lines = ['YOUR WALK SUGGESTIONS', '-' * WIDTH,
+    lines = ['=' * WIDTH, 'YOUR WALK SUGGESTIONS', '=' * WIDTH,
              f"Up to {preferences['max_minutes']:g} min | Grade {preferences['max_grade']} or below"]
     if preferences['max_distance'] is not None:
         lines.append(f"Distance limit: {preferences['max_distance']:g} km")
@@ -232,8 +235,8 @@ def short_results(results, preferences):
 
 def format_results(results, preferences, ready):
     lines = ['Blue Mountains Handbook — Personalised Bushwalking & Local Guide',
-             'Find a walk that fits your day.', wrapped(NOTICE, ''), ALERTS,
-             'Council-managed tracks: ' + COUNCIL, '', 'Your preferences:']
+             'Find a walk that fits your day.', wrapped(NOTICE, ''), NPWS_ALERTS,
+             'Council-managed tracks: ' + BMCC, '', 'Your preferences:']
     labels = {'max_minutes': 'Walking time limit (minutes)', 'max_distance': 'Distance limit (km)',
               'max_grade': 'Maximum grade', 'transport': 'Transport', 'scenery': 'Scenery',
               'mood': 'Mood', 'route': 'Route style'}
@@ -304,8 +307,8 @@ def main():
     print('Personalised Bushwalking & Local Guide')
     print('Find a walk that fits your day.\n')
     print(wrapped(NOTICE, ''))
-    print(ALERTS)
-    print('Council-managed tracks:', COUNCIL)
+    print(NPWS_ALERTS)
+    print('Council-managed tracks:', BMCC)
     try:
         locations, trails = load_catalogue()
     except (OSError, ValueError, csv.Error) as error:
@@ -315,7 +318,7 @@ def main():
     print(f'\n{len(locations)} towns | {len(trails)} walks | No internet needed to run')
     try:
         while True:
-            print('\n1. Find a Walk for Me\n2. Browse Walks\n3. Explore Blue Mountains\n4. Exit')
+            print('\n1. Find a Walk for Me\n2. Browse Walks\n3. Explore Local Towns in the Blue Mountains\n4. Exit')
             choice = choose('Choose a menu item', ['1', '2', '3', '4'])
             if choice == '1':
                 find_walk(trails)
