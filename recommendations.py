@@ -3,8 +3,9 @@ from data_loader import MOODS, SCENERY, positive_number
 
 
 def validate_preferences(preferences):
-    for key in ('max_minutes', 'max_distance'):
-        positive_number(preferences[key])
+    positive_number(preferences['max_minutes'])
+    if preferences['max_distance'] is not None:
+        positive_number(preferences['max_distance'])
     if preferences['max_grade'] not in range(1, 6):
         raise ValueError('Maximum grade must be 1 to 5')
     if preferences.get('route', 'any') not in ('any', 'loop', 'return', 'one-way'):
@@ -22,9 +23,11 @@ def exclusion_reasons(trail, preferences):
     reasons = []
     if trail['minutes'] > preferences['max_minutes']:
         reasons.append('exceeds time limit')
-    if trail['distance_km'] > preferences['max_distance']:
+    if preferences['max_distance'] is not None and trail['distance_km'] > preferences['max_distance']:
         reasons.append('exceeds distance limit')
-    if trail['grade'] > preferences['max_grade']:
+    if trail['grade'] is None:
+        reasons.append('numeric grade unverified; available in Browse Walks only')
+    elif trail['grade'] > preferences['max_grade']:
         reasons.append('exceeds maximum grade')
     if preferences['transport'] == 'public' and not trail['public_transport']:
         reasons.append('public transport access not included in this catalogue')
@@ -64,7 +67,7 @@ def trade_offs(trail, preferences):
     if preferences.get('route', 'any') not in ('any', trail['route']):
         notes.append(f"This is a {trail['route']} walk, not your preferred route style.")
     if preferences['transport'] == 'public':
-        notes.append('Station and bus-stop transfers add walking and travel beyond your limits.')
+        notes.append('Check the access note: additional transfers may be outside the stated walking figures.')
     if trail['route'] == 'one-way':
         notes.append('The stated distance and time do not include a return journey.')
     return notes
@@ -87,10 +90,12 @@ def preparation(trail, ready):
              'Check NPWS and council track notices and weather; tell someone your plans.']
     if trail['minutes'] >= 180:
         notes.append('Allow a full walking session; pack food and an offline map.')
-    if trail['grade'] >= 3:
+    if trail['grade'] is None or trail['grade'] >= 3:
         notes.append('Expect uneven surfaces and steps; assess your fitness and experience.')
     if trail['route'] == 'one-way':
         notes.append('One-way figures only: arrange pickup or allow extra time and distance to return.')
+    if trail['id'] == 'night-lit':
+        notes.append('Bring a torch; confirm lighting hours and closures with council. Keep to the lit route.')
     if trail['id'] == 'grand-canyon':
         notes.append('Do not enter the canyon before, during or after heavy rain; check NPWS advice.')
     if trail['id'] == 'lockley-pylon':
@@ -100,3 +105,10 @@ def preparation(trail, ready):
     if not ready:
         notes.append('You reported missing basic gear: prepare before undertaking any walk.')
     return notes
+
+
+def time_alternatives(trails, preferences):
+    """Find walks blocked only by time, without changing the user's limits."""
+    return sorted([trail for trail in trails
+                   if exclusion_reasons(trail, preferences) == ['exceeds time limit']],
+                  key=lambda trail: (trail['minutes'], trail['name']))
