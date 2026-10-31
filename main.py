@@ -76,7 +76,7 @@ def trail_text(trail):
 
 
 def explore(locations, trails):
-    heading('EXPLORE BLUE MOUNTAINS')
+    heading('EXPLORE LOCAL TOWNS IN THE BLUE MOUNTAINS')
     options = ['all'] + [location['id'] for location in locations] + ['back']
     selected = choose('Choose an area', options)
     for location in locations:
