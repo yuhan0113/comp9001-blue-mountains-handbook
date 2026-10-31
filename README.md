@@ -115,9 +115,3 @@ Suggested reading order:
 4. Change one preference and predict which walks disappear or change score.
 5. Read `preparation()` and `save_report()`; save two sessions and inspect the output.
 6. Run `tests.py`, then add a test when changing a scoring rule or adding a walk.
-
-Keep future changes within the intended 8–12 hour project scope: first review the data, wording and scoring weights together. A GUI, live routing and large datasets are outside the current scope. No claim is made that 8–12 hours of student work has already occurred.
-
-## AI assistance and submission review
-
-This implementation, tests, data summaries and documentation were prepared with AI assistance. The student should review and understand each part, verify the course's current assessment and AI-disclosure requirements, and record their own modifications before submission. The final-project rubric was not available in this repository, so this implementation follows the approved README scope and is not a claim of rubric compliance. Any required report, declaration or demonstration should reflect the student's actual work and understanding.
