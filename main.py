@@ -165,29 +165,57 @@ def browse(locations, trails):
             return
         print('\n' + trail_text(selected[int(choice) - 1]))
         print('-' * WIDTH)
-
-
+    
 def collect_preferences():
     heading('FIND A WALK FOR ME')
-    mood = choose('How are you feeling today?', ['relaxed', 'exploring', 'active', 'any'],
-                  {'relaxed': 'Taking it easy', 'exploring': 'Keen to explore',
-                   'active': 'Ready for a workout'})
-    scenery = choose('What would you like to see?', ['views', 'waterfalls', 'forest', 'any'])
+
+    mood = choose(
+        'How are you feeling today?',
+        ['relaxed', 'exploring', 'active', 'any'],
+        {
+            'relaxed': 'Taking it easy',
+            'exploring': 'Keen to explore',
+            'active': 'Ready for a workout'
+        }
+    )
+
     print('\nAllow extra time for travel and breaks. Walk times are planning estimates.')
     minutes = ask_number('How much walking time do you have (minutes)? ')
-    difficulty = choose('What difficulty are you comfortable with?',
-                        ['easy', 'moderate', 'hard'],
-                        {'easy': 'Easy', 'moderate': 'Moderate', 'hard': 'Hard'})
-    transport = choose('How will you get there?', ['car', 'public'],
-                       {'public': 'Public transport'})
+
+    scenery = choose(
+        'What would you like to see?',
+        ['views', 'waterfalls', 'forest', 'any']
+    )
+
+    difficulty = choose(
+        'What difficulty are you comfortable with?',
+        ['easy', 'moderate', 'hard'],
+        {
+            'easy': 'Easy',
+            'moderate': 'Moderate',
+            'hard': 'Hard'
+        }
+    )
+
     distance = None
     route = 'any'
-    if choose('Set a distance limit or preferred route style?', ['no', 'yes']) == 'yes':
+
+    if choose('Set extra preferences?', ['no', 'yes']) == 'yes':
         distance = ask_number('Maximum walking distance in km: ')
-        route = choose('Preferred route style', ['any', 'loop', 'return', 'one-way'])
-    return dict(mood=mood, scenery=scenery, max_minutes=minutes,
-                difficulty=difficulty,
-                transport=transport, max_distance=distance, route=route)
+        route = choose(
+            'Preferred route style',
+            ['loop', 'return', 'one-way', 'any'],
+            {'any': 'No preference'}
+        )
+
+    return {
+        'mood': mood,
+        'max_minutes': minutes,
+        'scenery': scenery,
+        'difficulty': difficulty,
+        'max_distance': distance,
+        'route': route
+    }
 
 
 def short_results(results, preferences):
@@ -234,9 +262,14 @@ def format_results(results, preferences, ready):
     lines = ['Blue Mountains Handbook — Personalised Bushwalking & Local Guide',
              'Find a walk that fits your day.', wrapped(NOTICE, ''), NPWS_ALERTS,
              'Council-managed tracks: ' + BMCC, '', 'Your preferences:']
-    labels = {'max_minutes': 'Walking time limit (minutes)', 'max_distance': 'Distance limit (km)',
-              'difficulty': 'Maximum difficulty', 'transport': 'Transport', 'scenery': 'Scenery',
-              'mood': 'Mood', 'route': 'Route style'}
+    labels = {
+    'mood': 'Mood',
+    'max_minutes': 'Walking time limit (minutes)',
+    'scenery': 'Scenery',
+    'difficulty': 'Maximum difficulty',
+    'max_distance': 'Distance limit (km)',
+    'route': 'Route style'
+}
     for key, value in preferences.items():
         if value is None or value == 'any':
             value = 'No preference'

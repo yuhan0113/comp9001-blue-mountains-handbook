@@ -6,42 +6,51 @@ DIFFICULTY_LEVELS = {
     'moderate': 2,
     'hard': 3,
 }
-
-
+    
 def validate_preferences(preferences):
     positive_number(preferences['max_minutes'])
+
     if preferences['max_distance'] is not None:
         positive_number(preferences['max_distance'])
+
     if preferences['difficulty'] not in DIFFICULTIES:
         raise ValueError('Unknown difficulty preference')
+
     if preferences.get('route', 'any') not in ('any', 'loop', 'return', 'one-way'):
         raise ValueError('Unknown route preference')
-    if preferences['transport'] not in ('car', 'public'):
-        raise ValueError('Transport must be car or public')
+
     if preferences['scenery'] not in SCENERY + ('any',):
         raise ValueError('Unknown scenery preference')
+
     if preferences['mood'] not in MOODS + ('any',):
         raise ValueError('Unknown mood preference')
-
 
 def exclusion_reasons(trail, preferences):
     """Hard limits are never overridden by a high preference score."""
     reasons = []
+
     if trail['minutes'] > preferences['max_minutes']:
         reasons.append('exceeds time limit')
-    if preferences['max_distance'] is not None and trail['distance_km'] > preferences['max_distance']:
+
+    if (
+        preferences['max_distance'] is not None
+        and trail['distance_km'] > preferences['max_distance']
+    ):
         reasons.append('exceeds distance limit')
-    if DIFFICULTY_LEVELS[trail['difficulty']] > DIFFICULTY_LEVELS[preferences['difficulty']]:
+
+    if (
+        DIFFICULTY_LEVELS[trail['difficulty']]
+        > DIFFICULTY_LEVELS[preferences['difficulty']]
+    ):
         reasons.append('exceeds preferred difficulty')
-    if preferences['transport'] == 'public' and not trail['public_transport']:
-        reasons.append('public transport access not included in this catalogue')
+
     return reasons
 
 
 def score_trail(trail, preferences):
     """40 points for eligibility, then scenery (30), mood (20) and route (10)."""
     score = 40
-    reasons = ['Fits your walking time, distance, difficulty and access limits (+40)']
+    reasons = ['Fits your walking time, distance and difficulty limits (+40)']
     if preferences['scenery'] == 'any':
         score += 30
         reasons.append('No scenery preference; equal scenery points (+30)')
@@ -60,22 +69,32 @@ def score_trail(trail, preferences):
         reasons.append('Route matches, or no route preference (+10)')
     return score, reasons
 
-
 def trade_offs(trail, preferences):
     """Explain unmet soft preferences without excluding the walk."""
     notes = []
-    if preferences['scenery'] != 'any' and preferences['scenery'] not in trail['scenery']:
-        notes.append(f"Does not have the requested {preferences['scenery']} scenery tag.")
-    if preferences['mood'] != 'any' and preferences['mood'] != trail['mood']:
-        notes.append(f"Tagged {trail['mood']}, rather than your {preferences['mood']} mood.")
+    if (
+        preferences['scenery'] != 'any'
+        and preferences['scenery'] not in trail['scenery']
+    ):
+        notes.append(
+            f"Does not have the requested {preferences['scenery']} scenery tag."
+        )
+    if (
+        preferences['mood'] != 'any'
+        and preferences['mood'] != trail['mood']
+    ):
+        notes.append(
+            f"Tagged {trail['mood']}, rather than your {preferences['mood']} mood."
+        )
     if preferences.get('route', 'any') not in ('any', trail['route']):
-        notes.append(f"This is a {trail['route']} walk, not your preferred route style.")
-    if preferences['transport'] == 'public':
-        notes.append('Check the access note: additional transfers may be outside the stated walking figures.')
+        notes.append(
+            f"This is a {trail['route']} walk, not your preferred route style."
+        )
     if trail['route'] == 'one-way':
-        notes.append('The stated distance and time do not include a return journey.')
+        notes.append(
+            'The stated distance and time do not include a return journey.'
+        )
     return notes
-
 
 def recommend(trails, preferences):
     """Return all eligible matches, highest score first; ties favour shorter walks."""
