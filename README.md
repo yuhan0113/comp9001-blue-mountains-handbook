@@ -3,13 +3,11 @@
 
 **Find a walk that fits your day.**
 
-Repository: https://github.com/yuhan0113/comp9001-blue-mountains-handbook
-
-Student Name: Yu-Han CHANG
-
-Student ID: 540 140 295
-
-Tutorial Activity 01 (Niousha Nazemi)
+**University:** The University of Sydney  
+**Student:** Yu-Han Chang  
+**Student ID:** 540140295  
+**Tutorial:** Activity 01 - Niousha Nazemi  
+**Github Repository (Private):** https://github.com/yuhan0113/comp9001-blue-mountains-handbook
 
 ## Run the program
 
