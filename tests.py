@@ -16,7 +16,7 @@ from recommendations import exclusion_reasons, preparation, recommend, trade_off
 
 
 def preferences(**changes):
-    result = dict(max_minutes=300, max_distance=10, max_grade=3,
+    result = dict(max_minutes=300, max_distance=10, difficulty='moderate',
                   transport='car', scenery='forest', mood='active')
     result.update(changes)
     return result
@@ -43,7 +43,7 @@ class RecommendationTests(unittest.TestCase):
         trail = self.by_id['grand-canyon']
         for changes, reason in [({'max_minutes': 239}, 'time'),
                                 ({'max_distance': 6.2}, 'distance'),
-                                ({'max_grade': 2}, 'grade'),
+                                ({'difficulty': 'easy'}, 'difficulty'),
                                 ({'transport': 'public'}, 'transport')]:
             with self.subTest(changes=changes):
                 self.assertEqual(recommend([trail], preferences(**changes)), [])
@@ -59,7 +59,7 @@ class RecommendationTests(unittest.TestCase):
     def test_public_transport(self):
         results = recommend(self.trails, preferences(transport='public'))
         self.assertEqual({r['trail']['id'] for r in results},
-                         {'three-sisters', 'south-lawson', 'gordon-katoomba', 'night-lit', 'woodford-creek'})
+                         {'three-sisters', 'south-lawson', 'gordon-katoomba', 'night-lit', 'woodford-creek', 'horseshoe'})
 
     def test_any_preferences_and_ties(self):
         results = recommend(list(reversed(self.trails)), preferences(scenery='any', mood='any'))
@@ -68,7 +68,7 @@ class RecommendationTests(unittest.TestCase):
 
     def test_invalid_preferences(self):
         for changes in ({'max_minutes': float('nan')}, {'max_distance': float('inf')},
-                        {'max_minutes': 0}, {'max_grade': 6}, {'scenery': 'snow'},
+                        {'max_minutes': 0}, {'difficulty': 'extreme'}, {'scenery': 'snow'},
                         {'mood': 'sleepy'}, {'transport': 'helicopter'}, {'route': 'flight'}):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 recommend(self.trails, preferences(**changes))
@@ -90,7 +90,7 @@ class RecommendationTests(unittest.TestCase):
 
     def test_south_lawson_profile(self):
         results = recommend(self.trails, preferences(max_minutes=120, max_distance=4,
-                            max_grade=2, scenery='waterfalls', mood='exploring', route='loop'))
+                            difficulty='easy', scenery='waterfalls', mood='exploring', route='loop'))
         self.assertEqual(results[0]['trail']['id'], 'south-lawson')
         self.assertEqual(results[0]['score'], 100)
 
@@ -99,18 +99,23 @@ class RecommendationTests(unittest.TestCase):
             local = [t for t in self.trails if t['location_id'] == location['id']]
             self.assertTrue(local or location['nearby_walk_ids'], location['name'])
 
-    def test_unknown_grade_never_recommended(self):
+    def test_difficulty_filter(self):
+        trail = self.by_id['porters-pass']
+        self.assertEqual(recommend([trail], preferences(difficulty='moderate')), [])
+        self.assertEqual(len(recommend([trail], preferences(difficulty='hard'))), 1)
+
+    def test_birdwood_can_be_recommended(self):
         trail = self.by_id['birdwood']
-        self.assertIsNone(trail['grade'])
-        self.assertEqual(recommend([trail], preferences(max_grade=5)), [])
-        self.assertIn('numeric grade unverified', ' '.join(exclusion_reasons(trail, preferences())))
+        self.assertEqual(trail['difficulty'], 'moderate')
+        self.assertEqual(len(recommend([trail], preferences(difficulty='moderate'))), 1)
 
     def test_elevation_is_known_or_explicitly_unknown(self):
         self.assertEqual(self.by_id['porters-pass']['elevation_gain_m'], 473)
         self.assertEqual(self.by_id['florabella']['elevation_gain_m'], 406)
-        self.assertEqual(self.by_id['grand-canyon']['elevation_gain_m'], 443)
-        self.assertIn('about 443 m', main.trail_text(self.by_id['grand-canyon']))
+        self.assertEqual(self.by_id['victory-sassafras']['elevation_gain_m'], 338)
+        self.assertIsNone(self.by_id['grand-canyon']['elevation_gain_m'])
         self.assertIsNone(self.by_id['fairfax']['elevation_gain_m'])
+        self.assertIn('estimate unavailable', main.trail_text(self.by_id['grand-canyon']))
 
     def test_night_walk_preparation(self):
         self.assertIn('torch', ' '.join(preparation(self.by_id['night-lit'], True)))
@@ -125,12 +130,12 @@ class RecommendationTests(unittest.TestCase):
         self.assertTrue(recommend([trail], preferences(max_distance=None)))
 
     def test_time_alternatives_preserve_other_limits(self):
-        prefs = preferences(max_minutes=30, max_distance=2, max_grade=2)
+        prefs = preferences(max_minutes=30, max_distance=2, difficulty='easy')
         before = dict(prefs)
         options = time_alternatives(self.trails, prefs)
         self.assertTrue(options)
         self.assertEqual(min(t['minutes'] for t in options), 45)
-        self.assertTrue(all(t['grade'] <= 2 and t['distance_km'] <= 2 for t in options))
+        self.assertTrue(all(t['difficulty'] == 'easy' and t['distance_km'] <= 2 for t in options))
         self.assertEqual(prefs, before)
         self.assertEqual(recommend(self.trails, prefs), [])
 
@@ -156,7 +161,7 @@ class FileTests(unittest.TestCase):
             writer.writerows(rows)
 
     def test_invalid_fields(self):
-        for field, value in [('distance_km', 'nan'), ('minutes', '-5'), ('grade', '9'),
+        for field, value in [('distance_km', 'nan'), ('minutes', '-5'), ('difficulty', 'extreme'),
                              ('location_id', 'unknown'), ('public_transport', 'maybe'),
                              ('route', 'flight'), ('scenery', 'snow'), ('mood', 'sleepy'),
                              ('id', 'fairfax'), ('name', ''), ('elevation_gain_m', '-1'),
@@ -283,10 +288,12 @@ class InteractionTests(unittest.TestCase):
         self.assertEqual(len({len(row) for row in rows}), 1)
         self.assertTrue(all(len(line) <= main.WIDTH for line in lines))
         for row, trail in zip(rows, trails):
-            self.assertEqual(float(row[38:43]), trail['distance_km'])
-            self.assertEqual(int(row[44:48]), trail['minutes'])
+            self.assertEqual(float(row[34:39]), trail['distance_km'])
+            self.assertEqual(int(row[40:44]), trail['minutes'])
         self.assertIn('--', '\n'.join(rows))
-        self.assertIn('?', '\n'.join(rows))
+        self.assertIn('Easy', '\n'.join(rows))
+        self.assertIn('Moderate', '\n'.join(rows))
+        self.assertIn('Hard', '\n'.join(rows))
 
     def test_nearby_walks_are_labelled(self):
         output = io.StringIO()

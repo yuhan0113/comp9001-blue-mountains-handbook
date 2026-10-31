@@ -1,13 +1,19 @@
 """Simple, explainable filtering and scoring using lists and dictionaries."""
-from data_loader import MOODS, SCENERY, positive_number
+from data_loader import DIFFICULTIES, MOODS, SCENERY, positive_number
+
+DIFFICULTY_LEVELS = {
+    'easy': 1,
+    'moderate': 2,
+    'hard': 3,
+}
 
 
 def validate_preferences(preferences):
     positive_number(preferences['max_minutes'])
     if preferences['max_distance'] is not None:
         positive_number(preferences['max_distance'])
-    if preferences['max_grade'] not in range(1, 6):
-        raise ValueError('Maximum grade must be 1 to 5')
+    if preferences['difficulty'] not in DIFFICULTIES:
+        raise ValueError('Unknown difficulty preference')
     if preferences.get('route', 'any') not in ('any', 'loop', 'return', 'one-way'):
         raise ValueError('Unknown route preference')
     if preferences['transport'] not in ('car', 'public'):
@@ -25,10 +31,8 @@ def exclusion_reasons(trail, preferences):
         reasons.append('exceeds time limit')
     if preferences['max_distance'] is not None and trail['distance_km'] > preferences['max_distance']:
         reasons.append('exceeds distance limit')
-    if trail['grade'] is None:
-        reasons.append('numeric grade unverified; available in Browse Walks only')
-    elif trail['grade'] > preferences['max_grade']:
-        reasons.append('exceeds maximum grade')
+    if DIFFICULTY_LEVELS[trail['difficulty']] > DIFFICULTY_LEVELS[preferences['difficulty']]:
+        reasons.append('exceeds preferred difficulty')
     if preferences['transport'] == 'public' and not trail['public_transport']:
         reasons.append('public transport access not included in this catalogue')
     return reasons
@@ -37,7 +41,7 @@ def exclusion_reasons(trail, preferences):
 def score_trail(trail, preferences):
     """40 points for eligibility, then scenery (30), mood (20) and route (10)."""
     score = 40
-    reasons = ['Fits your walking time, distance, grade and access limits (+40)']
+    reasons = ['Fits your walking time, distance, difficulty and access limits (+40)']
     if preferences['scenery'] == 'any':
         score += 30
         reasons.append('No scenery preference; equal scenery points (+30)')
@@ -90,8 +94,10 @@ def preparation(trail, ready):
              'Check NPWS and council track notices and weather; tell someone your plans.']
     if trail['minutes'] >= 180:
         notes.append('Allow a full walking session; pack food and an offline map.')
-    if trail['grade'] is None or trail['grade'] >= 3:
-        notes.append('Expect uneven surfaces and steps; assess your fitness and experience.')
+    if trail['difficulty'] in ('moderate', 'hard'):
+        notes.append('Expect uneven surfaces, steps or steeper sections; assess your fitness and experience.')
+    if trail['difficulty'] == 'hard':
+        notes.append('This is one of the more demanding walks in this guide; allow additional preparation.')
     if trail['route'] == 'one-way':
         notes.append('One-way figures only: arrange pickup or allow extra time and distance to return.')
     if trail['id'] == 'night-lit':

@@ -7,8 +7,9 @@ from data_loader import BASE_DIR, load_catalogue, positive_number
 from recommendations import preparation, recommend, trade_offs, time_alternatives
 
 NOTICE = (
-    'Offline data. Track conditions may subject to weather. '
-    'Check current NPWS alerts, Blue Mountains City Council notices. '
+    'Offline guide only. Track conditions may change. '
+    'Check current NPWS alerts, Blue Mountains City Council notices, '
+    'weather and access conditions before walking.'
 )
 
 NPWS_ALERTS = 'https://www.nationalparks.nsw.gov.au/alerts/alerts-list'
@@ -78,7 +79,7 @@ def trail_text(trail):
     duration = duration.strip()
     area = trail['location_id'].replace('-', ' ').title()
     lines = [wrapped(trail['name'], ''), f"  {area} | {trail['distance_km']:g} km {trail['route']} | "
-             f"{duration} | Grade {trail['grade'] if trail['grade'] is not None else 'unverified'}",
+             f"{duration} | Difficulty: {trail['difficulty'].title()}",
              wrapped('Elevation gain: ' + (f"about {trail['elevation_gain_m']} m"
                      if trail['elevation_gain_m'] is not None else 'estimate unavailable')),
 
@@ -89,8 +90,6 @@ def trail_text(trail):
              '  Source: ' + trail['source']]
     if trail['elevation_gain_m'] is not None:
         lines.append(wrapped('Elevation source: ' + trail['elevation_source']))
-    if trail['grade'] is None:
-        lines.append(wrapped('Browse only: a numeric grade is needed before this walk can be recommended.'))
     return '\n'.join(lines)
 
 
@@ -125,16 +124,16 @@ def explore(locations, trails):
 
 def walk_list_lines(trails):
     """Fixed-width numeric columns; long names continue on their own lines."""
-    lines = [f"{'No.':>3}  {'Walk':<32} {'km':>5} {'min':>4} {'Grade':>5} {'Gain m':>7}"]
+    lines = [f"{'No.':>3}  {'Walk':<28} {'km':>5} {'min':>4} {'Difficulty':>10} {'Gain m':>7}"]
     for index, trail in enumerate(trails, 1):
-        names = textwrap.wrap(trail['name'], width=32)
-        grade = str(trail['grade']) if trail['grade'] is not None else '?'
+        names = textwrap.wrap(trail['name'], width=28)
+        difficulty = trail['difficulty'].title()
         gain = str(trail['elevation_gain_m']) if trail['elevation_gain_m'] is not None else '--'
-        lines.append(f"{index:>3}  {names[0]:<32} {trail['distance_km']:>5.1f} "
-                     f"{trail['minutes']:>4} {grade:>5} {gain:>7}")
+        lines.append(f"{index:>3}  {names[0]:<28} {trail['distance_km']:>5.1f} "
+                     f"{trail['minutes']:>4} {difficulty:>10} {gain:>7}")
         for name in names[1:]:
             lines.append('     ' + name)
-    lines.append('Gain = approximate total ascent. -- = unavailable; ? = unverified grade.')
+    lines.append('Difficulty = project category. Gain = approximate ascent. -- = unavailable.')
     return lines
 
 
@@ -177,10 +176,8 @@ def collect_preferences():
     print('\nAllow extra time for travel and breaks. Walk times are planning estimates.')
     minutes = ask_number('How much walking time do you have (minutes)? ')
     difficulty = choose('What difficulty are you comfortable with?',
-                        ['easy', 'moderate', 'challenging'],
-                        {'easy': 'Easy - grades 1 to 2',
-                         'moderate': 'Moderate - up to grade 3, with steps and hills',
-                         'challenging': 'Challenging - up to grade 5, experienced walkers'})
+                        ['easy', 'moderate', 'hard'],
+                        {'easy': 'Easy', 'moderate': 'Moderate', 'hard': 'Hard'})
     transport = choose('How will you get there?', ['car', 'public'],
                        {'public': 'Public transport'})
     distance = None
@@ -189,14 +186,14 @@ def collect_preferences():
         distance = ask_number('Maximum walking distance in km: ')
         route = choose('Preferred route style', ['any', 'loop', 'return', 'one-way'])
     return dict(mood=mood, scenery=scenery, max_minutes=minutes,
-                max_grade={'easy': 2, 'moderate': 3, 'challenging': 5}[difficulty],
+                difficulty=difficulty,
                 transport=transport, max_distance=distance, route=route)
 
 
 def short_results(results, preferences):
     """A compact screen view; the saved report retains full source notes."""
     lines = ['=' * WIDTH, 'YOUR WALK SUGGESTIONS', '=' * WIDTH,
-             f"Up to {preferences['max_minutes']:g} min | Grade {preferences['max_grade']} or below"]
+             f"Up to {preferences['max_minutes']:g} min | Difficulty: {preferences['difficulty'].title()} or easier"]
     if preferences['max_distance'] is not None:
         lines.append(f"Distance limit: {preferences['max_distance']:g} km")
     no_preferences = all(preferences.get(key, 'any') == 'any'
@@ -209,7 +206,7 @@ def short_results(results, preferences):
                 if trail['elevation_gain_m'] is not None else 'ascent estimate unavailable')
         lines.extend(['', wrapped(f"{index}. {trail['name']}", ''),
                       wrapped(f"{trail['distance_km']:g} km {trail['route']} | "
-                              f"{trail['minutes']} min | Grade {trail['grade']} | {gain}"),
+                              f"{trail['minutes']} min | {trail['difficulty'].title()} | {gain}"),
                       wrapped(trail['description'])])
         matches = []
         if preferences['mood'] != 'any' and trail['mood'] == preferences['mood']:
@@ -238,7 +235,7 @@ def format_results(results, preferences, ready):
              'Find a walk that fits your day.', wrapped(NOTICE, ''), NPWS_ALERTS,
              'Council-managed tracks: ' + BMCC, '', 'Your preferences:']
     labels = {'max_minutes': 'Walking time limit (minutes)', 'max_distance': 'Distance limit (km)',
-              'max_grade': 'Maximum grade', 'transport': 'Transport', 'scenery': 'Scenery',
+              'difficulty': 'Maximum difficulty', 'transport': 'Transport', 'scenery': 'Scenery',
               'mood': 'Mood', 'route': 'Route style'}
     for key, value in preferences.items():
         if value is None or value == 'any':
