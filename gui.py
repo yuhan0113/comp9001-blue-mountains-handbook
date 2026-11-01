@@ -42,7 +42,7 @@ def preferences_from_form(mood, minutes, scenery, difficulty, extra, distance, r
 
 
 def town_text(location, trails):
-    lines = [f"{location['name']}  |  NSW {location['postcode']}", '', location['description']]
+    lines = [location['name'], f"NSW {location['postcode']}", '', 'OVERVIEW', location['description']]
     for label, key in [('History', 'history'), ('Things to do', 'things_to_do'),
                        ('Food and supplies', 'food_supplies')]:
         lines.extend(['', label.upper(), location[key]])
@@ -71,10 +71,18 @@ def walk_detail_text(trail):
         trail['name'], trail['location_id'].replace('-', ' ').title(), '',
         f"{trail['distance_km']:g} km · {duration_text(trail['minutes'])} · "
         f"{trail['difficulty'].title()} · {trail['route'].title()}",
-        'Elevation gain: ' + elevation_text(trail), '', 'About this walk', trail['description'],
-        '', 'Scenery & mood', ', '.join(trail['scenery']) + ' · ' + trail['mood'],
-        '', 'Getting there', trail['transport_note'], '', 'Route notes', trail['data_note'],
-        '', 'References', trail['source'], trail['elevation_source']])
+        elevation_text(trail) + ' elevation gain', '', 'ABOUT THIS WALK', trail['description'],
+        '', 'SCENERY', ' · '.join(value.title() for value in trail['scenery']),
+        '', 'MOOD', next(label for label, value in MOOD_OPTIONS.items() if value == trail['mood']),
+        '', 'GETTING THERE', trail['transport_note'], '', 'ROUTE NOTES', trail['data_note'],
+        '', 'REFERENCES', trail['source'], trail['elevation_source']])
+
+
+def blend_colour(start, end, fraction):
+    """Interpolate two palette colours for a short hover transition."""
+    channels = [round(int(start[i:i + 2], 16) * (1 - fraction)
+                      + int(end[i:i + 2], 16) * fraction) for i in (1, 3, 5)]
+    return '#' + ''.join(f'{channel:02x}' for channel in channels)
 
 
 class BlueMountainsGUI:
@@ -83,6 +91,7 @@ class BlueMountainsGUI:
         self.root, self.locations, self.trails = root, locations, trails
         self.active_page = None
         self.report = None
+        self.button_surfaces = {}
         root.title('Blue Mountains Handbook')
         root.geometry('1100x700')
         root.minsize(960, 700)
@@ -99,6 +108,7 @@ class BlueMountainsGUI:
         for name in ('Find a Walk', 'Browse Walks', 'Explore Towns'):
             button = ttk.Button(sidebar, text=name, style='Nav.TButton',
                                 command=lambda n=name: self.show(n))
+            self.add_hover(button, BG_SIDEBAR, BG_PANEL, '#24343B')
             button.pack(fill='x', pady=4)
             self.nav[name] = button
             page = ttk.Frame(root, padding=(30, 24, 26, 12))
@@ -116,21 +126,32 @@ class BlueMountainsGUI:
         families = set(tkfont.families(self.root))
         self.font = next((name for name in ('SF Pro Text', 'Helvetica Neue', 'Helvetica')
                           if name in families), tkfont.nametofont('TkDefaultFont').actual('family'))
-        style = ttk.Style(self.root)
+        style = self.ttk_style = ttk.Style(self.root)
         style.theme_use('clam')
         style.configure('.', background=BG_DARK, foreground=TEXT_PRIMARY, font=(self.font, 11))
         style.configure('TFrame', background=BG_DARK)
         style.configure('Sidebar.TFrame', background=BG_SIDEBAR)
         style.configure('Identity.TLabel', background=BG_SIDEBAR, font=(self.font, 16, 'bold'))
         style.configure('SidebarMuted.TLabel', background=BG_SIDEBAR, foreground=TEXT_SECONDARY)
+        # Keep standard keyboard activation, but omit the dotted focus element.
+        style.layout('Nav.TButton', [('Button.border', {'sticky': 'nswe', 'children': [
+            ('Button.padding', {'sticky': 'nswe', 'children': [
+                ('Button.label', {'sticky': 'nswe'})]})]})])
         style.configure('Nav.TButton', background=BG_SIDEBAR, anchor='w', padding=(12, 12))
         style.map('Nav.TButton', background=[('active', BG_PANEL)])
         style.configure('Selected.Nav.TButton', background='#24343B')
-        style.configure('Tile.TButton', padding=(14, 13), background=BG_PANEL)
+        style.layout('Tile.TButton', style.layout('Nav.TButton'))
+        # Replace the removed 1 px focus inset to preserve button dimensions.
+        style.configure('Tile.TButton', padding=(15, 14), background=BG_PANEL)
         style.configure('Selected.Tile.TButton', background=ACCENT_BLUE)
         style.map('Selected.Tile.TButton', background=[('active', ACCENT_BLUE), ('pressed', ACCENT_BLUE)])
         style.map('Selected.Nav.TButton', background=[('active', '#24343B')])
         style.configure('TSeparator', background=BORDER)
+        style.configure('TPanedwindow', background=BORDER)
+        style.layout('Horizontal.Sash', [('Sash.hsash', {'sticky': 'nswe'})])
+        style.configure('Horizontal.Sash', sashthickness=2)
+        style.layout('Vertical.Sash', [('Sash.vsash', {'sticky': 'nswe'})])
+        style.configure('Vertical.Sash', sashthickness=2)
 
         style.configure('TLabel', background=BG_DARK)
         style.configure('Muted.TLabel', foreground=TEXT_SECONDARY)
@@ -161,12 +182,62 @@ class BlueMountainsGUI:
         style.configure('TCheckbutton', background=BG_DARK, foreground=TEXT_PRIMARY)
         style.map('TCheckbutton', background=[('active', BG_DARK)])
         style.configure('Treeview', background=BG_PANEL, fieldbackground=BG_PANEL,
-                        foreground=TEXT_PRIMARY, rowheight=30, borderwidth=0)
+                        foreground=TEXT_PRIMARY, rowheight=40, borderwidth=0)
+        style.configure('Treeview.Cell', padding=(12, 0))
         style.configure('Treeview.Heading', background=BG_SIDEBAR, foreground=TEXT_SECONDARY)
         style.map('Treeview', background=[('selected', ACCENT_BLUE)])
         self.root.option_add('*TCombobox*Listbox.background', BG_PANEL)
         self.root.option_add('*TCombobox*Listbox.foreground', TEXT_PRIMARY)
         self.root.option_add('*TCombobox*Listbox.selectBackground', ACCENT_BLUE)
+
+    def add_hover(self, button, normal, hover, selected=None):
+        """Give each button an independent surface; retain ttk keyboard bindings."""
+        name = f'Hover{len(self.button_surfaces)}.{button.cget("style")}'
+        self.button_surfaces[button] = dict(style=name, normal=normal, hover=hover,
+            selected_colour=selected, selected=False, hovered=False, colour=normal, job=None)
+        # Override theme active/pressed maps so they cannot interrupt the fade.
+        self.ttk_style.map(name, background=[('!disabled', normal)])
+        button.configure(style=name)
+        button.bind('<Enter>', lambda event: self.fade_surface(button, True), add='+')
+        button.bind('<Leave>', lambda event: self.fade_surface(button, False), add='+')
+        button.bind('<Destroy>', lambda event: self.cancel_fade(button), add='+')
+
+    def cancel_fade(self, button):
+        surface = self.button_surfaces[button]
+        if surface['job'] is not None:
+            self.root.after_cancel(surface['job'])
+            surface['job'] = None
+
+    def select_surface(self, button, selected):
+        surface = self.button_surfaces[button]
+        surface['selected'] = selected
+        self.fade_surface(button)
+
+    def fade_surface(self, button, hovered=None):
+        surface = self.button_surfaces[button]
+        if hovered is not None:
+            surface['hovered'] = hovered
+        self.cancel_fade(button)
+        target = (surface['selected_colour'] if surface['selected'] else
+                  surface['hover'] if surface['hovered'] else surface['normal'])
+        # Selection is immediate and always retains the exact approved colour.
+        if surface['selected']:
+            surface['colour'] = target
+            self.ttk_style.map(surface['style'], background=[('!disabled', target)])
+            return
+        start = surface['colour']
+        if start == target:
+            return
+
+        def step(number):
+            surface['job'] = None
+            colour = target if number == 6 else blend_colour(start, target, number / 6)
+            surface['colour'] = colour
+            self.ttk_style.map(surface['style'], background=[('!disabled', colour)])
+            if number < 6:
+                surface['job'] = self.root.after(20, step, number + 1)
+
+        surface['job'] = self.root.after(20, step, 1)
 
     def show(self, name):
         self.active_page = name
@@ -176,44 +247,73 @@ class BlueMountainsGUI:
         elif name == 'Explore Towns':
             self.root.after_idle(lambda: self.towns_split.sashpos(0, 270))
         for label, button in self.nav.items():
-            button.configure(style='Selected.Nav.TButton' if label == name else 'Nav.TButton')
+            self.select_surface(button, label == name)
 
     def text_panel(self, parent):
+        """One readable detail surface shared by walks and towns."""
         frame = ttk.Frame(parent)
-        frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(0, weight=1)
-        text = tk.Text(frame, wrap='word', bg=BG_DARK, fg=TEXT_PRIMARY,
-                       font=(self.font, 12), relief='flat', padx=16, pady=14,
-                       selectbackground=ACCENT_BLUE, highlightthickness=1, highlightbackground=BG_DARK,
-                       highlightcolor=ACCENT_GREEN, spacing1=3, spacing3=5, state='disabled')
-        text.tag_configure('title', font=(self.font, 21, 'bold'), foreground=TEXT_PRIMARY, spacing1=12)
-        text.tag_configure('divider', foreground=BORDER, spacing1=18, spacing3=18)
-        text.tag_configure('section', font=(self.font, 11, 'bold'), foreground=ACCENT_GREEN, spacing1=10)
-        scroll = ttk.Scrollbar(frame, command=text.yview)
+        content = ttk.Frame(frame, padding=(36, 26, 12, 26))
+        content.place(x=0, y=0, relheight=1)
+        # About 650 px of readable text, with the scrollbar just 12 px beside it.
+        frame.bind('<Configure>', lambda event: content.place_configure(
+            width=min(722, max(1, event.width))))
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(0, weight=1)
+        text = tk.Text(content, wrap='word', bg=BG_DARK, fg=TEXT_PRIMARY,
+                       width=1, height=1, font=(self.font, 12), relief='flat',
+                       padx=0, pady=0, borderwidth=0, selectbackground=ACCENT_BLUE,
+                       highlightthickness=0, spacing1=2, spacing3=6, state='disabled')
+        text.tag_configure('title', font=(self.font, 21, 'bold'), spacing3=8)
+        text.tag_configure('metadata', foreground=TEXT_SECONDARY, font=(self.font, 11))
+        text.tag_configure('section', font=(self.font, 11, 'bold'),
+                           foreground=ACCENT_GREEN, spacing1=14, spacing3=6)
+        scroll = ttk.Scrollbar(content, command=text.yview)
         text.configure(yscrollcommand=lambda first, last: self.scroll_visibility(scroll, first, last))
-        text.grid(row=0, column=0, sticky='nsew')
+        text.grid(row=0, column=0, sticky='nsew', padx=(0, 12))
         scroll.grid(row=0, column=1, sticky='ns')
         return frame, text
 
     def write(self, widget, text):
+        """Apply the same title, metadata and section hierarchy on both pages."""
         widget.configure(state='normal')
         widget.delete('1.0', 'end')
         widget.insert('1.0', text)
+        sections = {'OVERVIEW', 'ABOUT THIS WALK', 'HISTORY', 'THINGS TO DO',
+                    'FOOD AND SUPPLIES', 'LOCAL WALKS', 'SCENERY', 'MOOD',
+                    'GETTING THERE', 'ROUTE NOTES', 'REFERENCES'}
         for index, line in enumerate(text.splitlines(), 1):
-            if line.startswith('─'):
-                widget.tag_add('divider', f'{index}.0', f'{index}.end')
-            if line[:1].isdigit() and '. ' in line[:4]:
-                widget.tag_add('title', f'{index}.0', f'{index}.end')
-            elif line in ('Matches your day', 'Trade-offs', 'Getting there', 'Preparation', 'Your walk suggestions'):
-                widget.tag_add('section', f'{index}.0', f'{index}.end')
+            if index == 1:
+                tag = 'title'
+            elif index == 2 or (index in (4, 5) and ' · ' in line) or line.endswith(' elevation gain'):
+                tag = 'metadata'
+            elif line in sections or line.startswith('NEARBY / CONNECTING WALKS'):
+                tag = 'section'
+            else:
+                continue
+            widget.tag_add(tag, f'{index}.0', f'{index}.end')
         widget.configure(state='disabled')
         widget.yview_moveto(0)
 
+    def master_list(self, parent, row):
+        """Identical headerless, keyboard-selectable rows for both catalogues."""
+        frame = ttk.Frame(parent)
+        frame.grid(row=row, column=0, sticky='nsew')
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)
+        tree = ttk.Treeview(frame, columns=('walk',), show='', selectmode='browse')
+        tree.column('walk', width=200, minwidth=60, stretch=True)
+        tree.grid(row=0, column=0, sticky='nsew')
+        scroll = ttk.Scrollbar(frame, command=tree.yview)
+        scroll.grid(row=0, column=1, sticky='ns')
+        tree.configure(yscrollcommand=lambda first, last: self.scroll_visibility(scroll, first, last))
+        return tree
+
     def selector(self, parent, label, values, row):
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky='w', pady=(10, 4))
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky='w', pady=(0, 6))
         var = tk.StringVar(value=list(values)[0])
         box = ttk.Combobox(parent, textvariable=var, values=list(values), state='readonly', width=27)
         box.grid(row=row + 1, column=0, sticky='ew')
+        parent.columnconfigure(0, weight=1)
         return var
 
     def page_header(self, page, title, subtitle):
@@ -226,24 +326,36 @@ class BlueMountainsGUI:
         for index, label in enumerate(choices):
             button = ttk.Button(parent, text=label, style='Tile.TButton',
                                 command=lambda value=label: variable.set(value))
-            button.grid(row=index // columns, column=index % columns, sticky='ew', padx=(0, 8), pady=4)
-            parent.columnconfigure(index % columns, weight=1)
+            self.add_hover(button, BG_PANEL, BORDER, ACCENT_BLUE)
+            gap = 8 if index % columns < columns - 1 else 0
+            button.grid(row=index // columns, column=index % columns,
+                        sticky='ew', padx=(0, gap), pady=4)
+            parent.columnconfigure(index % columns, weight=1, uniform='tiles')
             buttons.append((label, button))
         def update(*args):
             for label, button in buttons:
-                button.configure(style='Selected.Tile.TButton' if variable.get() == label else 'Tile.TButton')
+                self.select_surface(button, variable.get() == label)
         variable.trace_add('write', update)
         update()
 
     def build_find(self, page):
-        page.columnconfigure(0, weight=1)
+        page.columnconfigure(1, weight=1)
         page.rowconfigure(0, weight=1)
+        viewport = ttk.Frame(page, width=800)
+        viewport.grid(row=0, column=0, sticky='ns')
+        viewport.grid_propagate(False)
+        viewport.columnconfigure(0, weight=1)
+        viewport.rowconfigure(0, weight=1)
+        # Match the page's 30 px left and 26 px right padding.
+        page.bind('<Configure>', lambda event: viewport.configure(
+            width=min(800, max(1, event.width - 56))))
+        page = viewport
         self.find_canvas = tk.Canvas(page, background=BG_DARK, highlightthickness=0, borderwidth=0)
         self.find_canvas.grid(row=0, column=0, sticky='nsew')
         scroll = ttk.Scrollbar(page, command=self.find_canvas.yview)
         scroll.grid(row=0, column=1, sticky='ns')
         self.find_canvas.configure(yscrollcommand=lambda first, last: self.scroll_visibility(scroll, first, last))
-        content = ttk.Frame(self.find_canvas, padding=(0, 0, 16, 28))
+        content = ttk.Frame(self.find_canvas, padding=(0, 0, 12, 28))
         window = self.find_canvas.create_window(0, 0, window=content, anchor='nw')
         self.find_canvas.bind('<Configure>', lambda event: self.find_canvas.itemconfigure(window, width=event.width))
         content.bind('<Configure>', lambda event: self.find_canvas.configure(scrollregion=self.find_canvas.bbox('all')))
@@ -263,16 +375,16 @@ class BlueMountainsGUI:
         self.tiles(mood_tiles, self.mood, MOOD_OPTIONS, 4)
         row = ttk.Frame(form)
         row.grid(row=2, column=0, sticky='ew')
-        row.columnconfigure(0, weight=1)
-        row.columnconfigure(1, weight=1)
-        time = ttk.Frame(row, padding=(0, 0, 18, 0))
-        time.grid(row=0, column=0, sticky='ew')
+        row.columnconfigure(0, weight=1, uniform='inputs')
+        row.columnconfigure(1, weight=1, uniform='inputs')
+        time = ttk.Frame(row, padding=(0, 0, 9, 0))
+        time.grid(row=0, column=0, sticky='new')
         ttk.Label(time, text='Walking time · minutes').pack(anchor='w', pady=(0, 6))
         self.minutes = tk.StringVar()
         self.time_entry = ttk.Entry(time, textvariable=self.minutes, width=12)
         self.time_entry.pack(fill='x')
-        scenery = ttk.Frame(row)
-        scenery.grid(row=0, column=1, sticky='ew')
+        scenery = ttk.Frame(row, padding=(9, 0, 0, 0))
+        scenery.grid(row=0, column=1, sticky='new')
         self.scenery = self.selector(scenery, 'What would you like to see?', SCENERY_OPTIONS, 0)
         self.scenery.set('No preference')
         ttk.Label(form, text='What difficulty are you comfortable with?').grid(row=3, column=0, sticky='w', pady=(16, 4))
@@ -286,18 +398,24 @@ class BlueMountainsGUI:
         self.extra_button.grid(row=5, column=0, sticky='w', pady=16)
         self.extra_frame = ttk.Frame(form)
         self.extra_frame.grid(row=6, column=0, sticky='ew')
-        ttk.Label(self.extra_frame, text='Maximum distance · km').grid(row=0, column=0, sticky='w')
+        self.extra_frame.columnconfigure(0, weight=1, uniform='extras')
+        self.extra_frame.columnconfigure(1, weight=1, uniform='extras')
+        distance_frame = ttk.Frame(self.extra_frame, padding=(0, 0, 9, 0))
+        distance_frame.grid(row=0, column=0, sticky='new')
+        ttk.Label(distance_frame, text='Maximum distance · km').pack(anchor='w', pady=(0, 6))
         self.distance = tk.StringVar()
-        self.distance_entry = ttk.Entry(self.extra_frame, textvariable=self.distance)
-        self.distance_entry.grid(row=1, column=0, sticky='ew', padx=(0, 18))
-        route_frame = ttk.Frame(self.extra_frame)
-        route_frame.grid(row=0, column=1, rowspan=2, sticky='ew')
+        self.distance_entry = ttk.Entry(distance_frame, textvariable=self.distance, width=12)
+        self.distance_entry.pack(fill='x')
+        route_frame = ttk.Frame(self.extra_frame, padding=(9, 0, 0, 0))
+        route_frame.grid(row=0, column=1, sticky='new')
         self.route = self.selector(route_frame, 'Preferred route style', ROUTE_OPTIONS, 0)
         self.route.set('No preference')
         self.extra_frame.grid_remove()
         actions = ttk.Frame(page)
         actions.grid(row=3, column=0, sticky='ew', pady=(10, 8))
         self.find_button = ttk.Button(actions, text='Find My Walk', style='Accent.TButton', command=self.find)
+        self.add_hover(self.find_button, ACCENT_BLUE,
+                       blend_colour(ACCENT_BLUE, TEXT_SECONDARY, 0.15))
         self.find_button.pack(side='right')
         self.feedback = tk.StringVar(value='Allow extra time for travel and breaks.')
         ttk.Label(page, textvariable=self.feedback, style='Muted.TLabel', wraplength=700).grid(
@@ -313,7 +431,6 @@ class BlueMountainsGUI:
         for variable in (self.mood, self.minutes, self.scenery, self.difficulty, self.extra, self.distance, self.route):
             variable.trace_add('write', self.preferences_changed)
         self.time_entry.bind('<Return>', lambda event: self.find())
-        self.result_label(self.results, 'Find a walk that fits your day.', 'title')
         self.result_label(self.results, 'Choose how you’re feeling, how much time you have and what you’d like to see.')
         self.result_label(self.results, f'{len(self.trails)} walks · {len(self.locations)} Blue Mountains towns and areas', 'muted')
 
@@ -478,7 +595,7 @@ class BlueMountainsGUI:
         page.rowconfigure(2, weight=1)
         split = ttk.Panedwindow(page, orient='horizontal')
         split.grid(row=2, column=0, sticky='nsew')
-        listing = ttk.Frame(split, padding=(0, 0, 14, 0))
+        listing = ttk.Frame(split, padding=(0, 0, 12, 0))
         listing.columnconfigure(0, weight=1)
         listing.rowconfigure(2, weight=1)
         split.add(listing, weight=0)
@@ -486,17 +603,7 @@ class BlueMountainsGUI:
         self.root.after_idle(lambda: split.sashpos(0, 420))
         self.area = self.selector(listing, 'Area', ['All'] + [l['name'] for l in self.locations], 0)
         listing.winfo_children()[-1].bind('<<ComboboxSelected>>', lambda event: self.filter_walks())
-        frame = ttk.Frame(listing)
-        frame.grid(row=2, column=0, sticky='nsew', pady=(14, 0))
-        frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(0, weight=1)
-        self.tree = ttk.Treeview(frame, columns=('walk',), show='', selectmode='browse', height=10)
-        self.tree.heading('walk', text='Walks')
-        self.tree.column('walk', width=400, minwidth=100)
-        self.tree.grid(row=0, column=0, sticky='nsew')
-        scroll = ttk.Scrollbar(frame, command=self.tree.yview)
-        scroll.grid(row=0, column=1, sticky='ns')
-        self.tree.configure(yscrollcommand=lambda first, last: self.scroll_visibility(scroll, first, last))
+        self.tree = self.master_list(listing, 2)
         self.tree.bind('<<TreeviewSelect>>', self.walk_details)
         self.tree.bind('<Configure>', lambda event: self.fit_walk_names())
         panel, self.details = self.text_panel(split)
@@ -523,7 +630,7 @@ class BlueMountainsGUI:
 
     def fit_walk_names(self):
         font = tkfont.Font(family=self.font, size=11)
-        width = max(100, self.tree.winfo_width() - 20)
+        width = max(100, self.tree.winfo_width() - 32)
         self.tree.column('walk', width=width)
         location = next((l for l in self.locations if l['name'] == self.area.get()), None)
         for trail in self.trails:
@@ -546,27 +653,21 @@ class BlueMountainsGUI:
             if location and trail['location_id'] != location['id']:
                 text += '\n\nNearby / connecting walk — travel to another area may be needed.'
             self.write(self.details, text)
-            self.details.tag_add('title', '1.0', '1.end')
 
     def build_towns(self, page):
         self.page_header(page, 'Explore Towns', 'A local handbook, from the foothills to the upper mountains.')
         page.rowconfigure(2, weight=1)
         split = ttk.Panedwindow(page, orient='horizontal')
         split.grid(row=2, column=0, sticky='nsew')
-        listing = ttk.Frame(split, padding=(0, 0, 14, 0))
+        listing = ttk.Frame(split, padding=(0, 0, 12, 0))
         listing.columnconfigure(0, weight=1)
         listing.rowconfigure(0, weight=1)
         split.add(listing, weight=0)
         self.towns_split = split
         self.root.after_idle(lambda: split.sashpos(0, 270))
-        self.town_list = ttk.Treeview(listing, show='tree', selectmode='browse')
-        self.town_list.column('#0', width=250, minwidth=160)
-        self.town_list.grid(row=0, column=0, sticky='nsew')
-        scrollbar = ttk.Scrollbar(listing, command=self.town_list.yview)
-        scrollbar.grid(row=0, column=1, sticky='ns')
-        self.town_list.configure(yscrollcommand=lambda first, last: self.scroll_visibility(scrollbar, first, last))
+        self.town_list = self.master_list(listing, 0)
         for location in self.locations:
-            self.town_list.insert('', 'end', iid=location['id'], text=location['name'])
+            self.town_list.insert('', 'end', iid=location['id'], values=(location['name'],))
         panel, self.town_details = self.text_panel(split)
         split.add(panel, weight=3)
         self.town_list.bind('<<TreeviewSelect>>', self.show_town)
@@ -578,12 +679,8 @@ class BlueMountainsGUI:
         if not selected:
             return
         location = next(l for l in self.locations if l['id'] == selected[0])
-        text = town_text(location, self.trails).replace('  |  ', '\n')
+        text = town_text(location, self.trails)
         self.write(self.town_details, text)
-        self.town_details.tag_add('title', '1.0', '1.end')
-        for index, line in enumerate(text.splitlines(), 1):
-            if line.isupper() and len(line) > 3:
-                self.town_details.tag_add('section', f'{index}.0', f'{index}.end')
 
 
 def main():
