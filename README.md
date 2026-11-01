@@ -1,33 +1,90 @@
-# USYD COMP9001 Final Project - Blue Mountains Handbook
+# USYD COMP9001 Final Project - Blue Mountains Handbook 🏔️
 ## Personalised Bushwalking & Local Guide
 
 **Student:** Yu-Han Chang  
 **Student ID:** 540140295  
 **Tutorial:** Activity 01 - Niousha Nazemi  
-**Github Repository (Private):** https://github.com/yuhan0113/comp9001-blue-mountains-handbook
+**GitHub Repository:** https://github.com/yuhan0113/comp9001-blue-mountains-handbook
 
-## Overview
+## 🌿 Overview
 
-Blue Mountains Handbook is a terminal-based Python program that helps users explore the Blue Mountains and find bushwalks that suit their preferences.
+Blue Mountains Handbook is an offline Python application that helps users explore the Blue Mountains and find a bushwalk suited to their day.
 
-The program contains 18 walks and 14 towns or areas. Users can receive personalised walk recommendations, browse the walking catalogue, explore local town information and save recommendation reports.
+The project contains **18 walks** and information about **14 Blue Mountains towns and areas**. Users can receive personalised walk recommendations, browse the walking catalogue, explore local town information and save recommendation reports.
 
-The recommendation system considers available walking time, difficulty, scenery, mood and optional distance or route preferences.
+Recommendations consider:
 
-## Requirements
+- current mood
+- available walking time
+- preferred scenery
+- comfortable difficulty
+- optional maximum distance
+- optional route style
+
+The project provides two interfaces over the same catalogue and recommendation logic:
+
+- an **assessor-friendly terminal interface**
+- an optional **Tkinter desktop interface**
+
+No internet connection or third-party Python packages are required.
+
+## 🖥️ Interfaces
+
+### Tkinter Desktop Interface
+
+Run:
+
+```sh
+python3 gui.py
+```
+
+The optional GUI provides the same core functionality using a dark Blue Mountains-inspired interface.
+
+#### Find a Walk
+
+<img src="images/gui-find.png" alt="Blue Mountains Handbook Find a Walk interface" width="900">
+
+#### Browse Walks
+
+<img src="images/gui-browse.png" alt="Blue Mountains Handbook Browse Walks interface" width="900">
+
+#### Explore Towns
+
+<img src="images/gui-towns.png" alt="Blue Mountains Handbook Explore Towns interface" width="900">
+
+### ⌨️ Terminal Interface
+
+The terminal version remains the primary assessor-friendly entry point.
+
+Run:
+
+```sh
+python3 main.py
+```
+
+<img src="images/cli.png" alt="Blue Mountains Handbook terminal interface" width="900">
+
+Both interfaces use the same data files and recommendation backend.
+
+## ⚙️ Requirements
 
 - Python 3.9 or later
-- The following project data files:
-  - `trails.csv`
-  - `locations.csv`
+- `trails.csv`
+- `locations.csv`
 
-Place all project files in the same folder before running the program.
+Keep all project files in the same folder.
 
-No third-party Python packages, installation or internet connection are required.
+The terminal interface requires only the Python standard library.
 
-## Running the Program
+The optional GUI uses Python's built-in `tkinter` and `ttk` modules. It therefore requires a graphical desktop environment and a Python installation with working Tkinter support.
 
-Open a terminal in the project folder, then run:
+No `pip install` step is required.
+
+## 🚀 Running the Program
+
+### Terminal version
+
+Open a terminal in the project folder and run:
 
 ```sh
 python3 main.py
@@ -40,33 +97,57 @@ The main menu provides four options:
 3. Explore Local Towns in the Blue Mountains
 4. Exit
 
-For personalised recommendations, the program asks for:
+### Graphical version
+
+Run:
+
+```sh
+python3 gui.py
+```
+
+The GUI provides three main sections:
+
+1. Find a Walk
+2. Browse Walks
+3. Explore Towns
+
+The GUI may need to be run locally outside Ed's terminal environment because it requires a graphical display.
+
+## 🥾 Find a Walk
+
+For personalised recommendations, users select:
 
 - current mood
 - available walking time
 - preferred scenery
 - comfortable difficulty
 
-Users may optionally set:
+Optional preferences include:
 
 - maximum walking distance
 - preferred route style
 
-Invalid input produces a message and another prompt. Missing or malformed catalogue files produce a startup error instead of continuing with incomplete data.
+The application validates numeric input and does not silently relax the user's limits.
 
-## Submission Files
+If no walk fits the selected limits, the program may suggest the shortest additional walking time required while preserving the other preferences. The user must confirm before the time limit is changed.
 
-- `main.py` — main menu, user interaction, walk and town display, and report saving.
+Up to three recommendations are displayed.
+
+## 📁 Submission Files
+
+- `main.py` — terminal interface, menus, walk and town display, report formatting and saving.
+- `gui.py` — optional Tkinter graphical interface.
 - `data_loader.py` — reads and validates the CSV catalogue.
 - `recommendations.py` — filters, scores and ranks suitable walks.
 - `trails.csv` — data for the 18 walking routes.
 - `locations.csv` — data for the 14 towns and areas.
 - `tests.py` — automated tests for recommendation logic, file handling and terminal interaction.
+- `test_gui.py` — GUI helper tests that do not require opening a window.
 - `README.md` — project overview and instructions.
 
-`saved_recommendations.txt` is created only when the user chooses to save a recommendation report and is not required for the initial program run.
+`saved_recommendations.txt` is created only when the user chooses to save a recommendation report. It is not required for the initial program run.
 
-## Recommendation Logic
+## 🧭 Recommendation Logic
 
 Walks are first filtered using three hard limits:
 
@@ -82,7 +163,11 @@ Difficulty uses three project-defined categories:
 Easy < Moderate < Hard
 ```
 
-An Easy selection includes Easy walks only. Moderate includes Easy and Moderate walks, while Hard allows all three categories.
+An Easy selection includes Easy walks only.
+
+A Moderate selection includes Easy and Moderate walks.
+
+A Hard selection allows all three categories.
 
 Eligible walks are then scored using:
 
@@ -94,18 +179,26 @@ The components are:
 
 ```text
 Eligibility     = 40 points
-Scenery Match  = 30 points
-Mood Match     = 20 points
-Route Match    = 10 points
+Scenery Match   = 30 points
+Mood Match      = 20 points
+Route Match     = 10 points
 ```
 
-No preference awards the same points to every eligible walk for that factor. Unmatched scenery, mood or route preferences are explained as trade-offs, not exclusions. Results are sorted by descending score, ascending walking time and alphabetical name. Up to three recommendations are displayed.
+Scenery, mood and route are soft preferences rather than exclusion rules.
 
-When no walks fit, the program can offer a longer time while preserving the other limits. It asks before changing the time; users can retry or return to the menu. Saved reports append to earlier sessions.
+If a soft preference does not match, the walk can still be recommended and the difference is explained as a trade-off.
 
-The score measures preference fit only. It is not a safety rating or confirmation that a track is currently open.
+Results are sorted by:
 
-## Walk and Town Information
+1. descending score
+2. ascending walking time
+3. alphabetical walk name
+
+Up to three recommendations are displayed.
+
+The score measures **preference fit only**. It is not a safety rating and does not confirm whether a track is currently open.
+
+## 🗺️ Walk Information
 
 Each walk may include:
 
@@ -113,29 +206,70 @@ Each walk may include:
 - estimated walking time
 - Easy, Moderate or Hard difficulty
 - route type
-- scenery and mood tags
+- scenery
+- mood
 - access information
 - description
-- elevation gain, with published sources or clearly labelled project estimates
-- source and route notes
+- elevation gain
+- source information
+- route notes
 
-Elevation is displayed for planning information only and does not affect recommendations. All 18 walks have a numeric ascent value. The catalogue retains the published estimates of 473 m (Porters Pass), 406 m (Florabella) and 338 m (Sassafras). Other ascent values are deliberately rough project estimates for comparison, not official or measured route totals; their source and route notes say so. Elevation has no effect on filtering or scores.
+Elevation is displayed for planning and comparison only. It does not affect filtering, eligibility, scoring or ranking.
+
+All 18 walks have a numeric ascent value.
+
+The catalogue retains the published estimates of:
+
+- **473 m** — Walls Ledge - Porters Pass - Centennial Glen circuit
+- **406 m** — Blaxland to Warrimoo via Florabella Pass
+- **338 m** — Faulconbridge to Springwood via Sassafras Gully
+
+Other ascent values are deliberately rough **project estimates** for comparison rather than official or measured route totals. These estimates are labelled accordingly in the catalogue.
+
+Transport information is retained as access information but is not used as a recommendation filter.
+
+## 🏘️ Town Information
+
+The application includes information for 14 Blue Mountains towns and areas.
 
 Town entries may include:
 
 - postcode
+- overview
 - short history
 - things to do
-- visitor information
 - food and supply suggestions
 - local walks
 - nearby or connecting walks
+- reference sources
 
-Transport information is retained as access information but is not used as a recommendation filter.
+Nearby or connecting walks are distinguished from walks located directly within the selected town or area.
 
-## Safety and Limitations
+## 💾 Saved Reports
 
-Blue Mountains Handbook is an offline educational guide and does not provide live information about track closures, weather, fire conditions, flooding, accessibility or transport services.
+Users can save their current recommendation results to:
+
+```text
+saved_recommendations.txt
+```
+
+New reports are appended to the existing file rather than replacing earlier sessions.
+
+The terminal and GUI interfaces use the same report format and save behaviour.
+
+## ⚠️ Safety and Limitations
+
+Blue Mountains Handbook is an offline educational guide.
+
+It does **not** provide live information about:
+
+- track closures
+- weather
+- bushfire conditions
+- flooding
+- accessibility
+- transport disruptions
+- current track condition
 
 Before walking, users should check current information from:
 
@@ -148,30 +282,81 @@ Walking times are planning estimates and do not include travel, breaks or unexpe
 
 The Easy, Moderate and Hard categories are project-defined comparison categories rather than official track grades.
 
-## Verification
+## ✅ Verification
 
-Run the automated tests with:
+Run the original terminal test suite with:
 
 ```sh
 python3 tests.py
 ```
 
-or:
+This suite contains **47 automated tests**.
+
+Run complete test discovery with:
 
 ```sh
 python3 -m unittest discover -v
 ```
 
-The terminal suite contains 47 automated tests. Test discovery also runs four GUI helper tests, for 51 tests in total.
+This also includes the four GUI helper tests in `test_gui.py`, giving:
 
-The project demonstrates file I/O through CSV loading and report writing, and program testing through standard-library `unittest`. Tests cover ranking, validation, file errors and terminal interactions.
+```text
+51 tests
+OK
+```
 
-## Optional graphical interface
+The final merged version has been verified with all **51 tests passing**.
 
-Run `python3 gui.py` for the optional dark-themed desktop interface. Find a Walk, Browse Walks and Explore Towns reuse the same catalogue and recommendation backend as the terminal application. Saved reports use the same format and append behaviour.
+The tests cover:
 
-The GUI uses Python's built-in Tkinter/ttk, with no third-party packages. It requires a graphical desktop and a Python installation that includes working Tkinter support. A missing Tkinter installation or unavailable display produces an explanatory message. The tutor may need to run it locally outside Ed's terminal environment. The primary terminal entry point remains `python3 main.py`.
+- recommendation filtering and ranking
+- difficulty limits
+- optional preferences
+- catalogue validation
+- file errors
+- saved-report append behaviour
+- terminal interaction
+- nearby-walk labelling
+- elevation handling
+- GUI preference conversion
+- shared GUI/terminal recommendation behaviour
 
-`gui.py` is the optional interface and `test_gui.py` contains four helper tests that do not open windows. The original `python3 tests.py` suite still has 47 tests; discovery also runs the four GUI helper tests (51 total).
+The project demonstrates advanced Python concepts including:
 
-The GUI Find page scrolls as one continuous page, with the questionnaire above all three suggestions. Browse uses a wider walk list and Explore uses a narrower town list; full names and sources remain available in details.
+- **File I/O** — CSV catalogue loading and recommendation report writing
+- **Program Testing** — automated tests using the standard-library `unittest` framework
+- **Error Handling** — validation of user input, catalogue files and save operations
+
+## 🧩 Project Structure
+
+```text
+Blue Mountains Handbook
+│
+├── main.py
+│   └── Terminal interface
+│
+├── gui.py
+│   └── Optional Tkinter interface
+│
+├── data_loader.py
+│   └── Catalogue loading and validation
+│
+├── recommendations.py
+│   └── Filtering, scoring and recommendation logic
+│
+├── trails.csv
+├── locations.csv
+│
+├── tests.py
+├── test_gui.py
+│
+├── images/
+│   ├── gui-find.png
+│   ├── gui-browse.png
+│   ├── gui-towns.png
+│   └── cli.png
+│
+└── README.md
+```
+
+Both interfaces use the same catalogue and recommendation logic. The graphical interface is a presentation layer rather than a separate implementation of the recommendation system.
