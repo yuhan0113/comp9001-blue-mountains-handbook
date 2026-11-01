@@ -271,20 +271,9 @@ class RecommendationTests(unittest.TestCase):
             338,
         )
 
-        self.assertIsNone(
-            self.by_id['grand-canyon']['elevation_gain_m']
-        )
-
-        self.assertIsNone(
-            self.by_id['fairfax']['elevation_gain_m']
-        )
-
-        self.assertIn(
-            'estimate unavailable',
-            main.trail_text(
-                self.by_id['grand-canyon']
-            ),
-        )
+        self.assertTrue(all(isinstance(t['elevation_gain_m'], int)
+                            and t['elevation_gain_m'] > 0 for t in self.trails))
+        self.assertTrue(self.by_id['grand-canyon']['elevation_source'].startswith('Project estimate'))
 
     def test_night_walk_preparation(self):
         self.assertIn(
@@ -882,10 +871,11 @@ class InteractionTests(unittest.TestCase):
 
         table = '\n'.join(rows)
 
-        self.assertIn(
-            '--',
-            table,
-        )
+        self.assertNotIn('--', table)
+        for row, trail in zip(rows, trails):
+            self.assertEqual(int(row.split()[-1]), trail['elevation_gain_m'])
+        missing = dict(trails[0], elevation_gain_m=None)
+        self.assertIn('--', '\n'.join(main.walk_list_lines([missing])))
 
         self.assertIn(
             'Easy',
