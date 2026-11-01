@@ -116,10 +116,10 @@ Each walk may include:
 - scenery and mood tags
 - access information
 - description
-- elevation gain where a suitable source is available
+- elevation gain, with published sources or clearly labelled project estimates
 - source and route notes
 
-Elevation is displayed for planning information only and does not affect recommendations. Missing elevation values are shown as `--`.
+Elevation is displayed for planning information only and does not affect recommendations. All 18 walks have a numeric ascent value. The catalogue retains the published estimates of 473 m (Porters Pass), 406 m (Florabella) and 338 m (Sassafras). Other ascent values are deliberately rough project estimates for comparison, not official or measured route totals; their source and route notes say so. Elevation has no effect on filtering or scores.
 
 Town entries may include:
 
@@ -162,6 +162,16 @@ or:
 python3 -m unittest discover -v
 ```
 
-The current version passes 47 automated tests.
+The terminal suite contains 47 automated tests. Test discovery also runs four GUI helper tests, for 51 tests in total.
 
 The project demonstrates file I/O through CSV loading and report writing, and program testing through standard-library `unittest`. Tests cover ranking, validation, file errors and terminal interactions.
+
+## Optional graphical interface
+
+Run `python3 gui.py` for the optional dark-themed desktop interface. Find a Walk, Browse Walks and Explore Towns reuse the same catalogue and recommendation backend as the terminal application. Saved reports use the same format and append behaviour.
+
+The GUI uses Python's built-in Tkinter/ttk, with no third-party packages. It requires a graphical desktop and a Python installation that includes working Tkinter support. A missing Tkinter installation or unavailable display produces an explanatory message. The tutor may need to run it locally outside Ed's terminal environment. The primary terminal entry point remains `python3 main.py`.
+
+`gui.py` is the optional interface and `test_gui.py` contains four helper tests that do not open windows. The original `python3 tests.py` suite still has 47 tests; discovery also runs the four GUI helper tests (51 total).
+
+The GUI Find page scrolls as one continuous page, with the questionnaire above all three suggestions. Browse uses a wider walk list and Explore uses a narrower town list; full names and sources remain available in details.
