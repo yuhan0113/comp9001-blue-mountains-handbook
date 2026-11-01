@@ -1162,6 +1162,45 @@ class InteractionTests(unittest.TestCase):
         )
 
 
+class FinalAuditTests(unittest.TestCase):
+    def test_unusual_menu_numbers_retry(self):
+        with patch('builtins.input', side_effect=['²', '9' * 5000, '2']), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main.choose('Choose', ['easy', 'moderate']), 'moderate')
+
+    def test_all_difficulty_limits_and_information_only_fields(self):
+        trails = load_catalogue()[1]
+        for level, allowed in [('easy', {'easy'}),
+                               ('moderate', {'easy', 'moderate'}),
+                               ('hard', {'easy', 'moderate', 'hard'})]:
+            prefs = preferences(difficulty=level, max_minutes=1000, max_distance=None)
+            results = recommend(trails, prefs)
+            self.assertEqual({r['trail']['id'] for r in results},
+                             {t['id'] for t in trails if t['difficulty'] in allowed})
+            changed = [dict(t, public_transport=not t['public_transport'],
+                            elevation_gain_m=9999) for t in trails]
+            self.assertEqual([(r['trail']['id'], r['score']) for r in results],
+                             [(r['trail']['id'], r['score']) for r in recommend(changed, prefs)])
+
+    def test_demo_and_all_extra_route_choices(self):
+        trails = load_catalogue()[1]
+        prefs = preferences(mood='exploring', max_minutes=70, scenery='waterfalls',
+                            difficulty='moderate', max_distance=None)
+        self.assertEqual([r['trail']['id'] for r in recommend(trails, prefs)[:3]],
+                         ['horseshoe', 'princes-rock', 'wentworth-track'])
+        for route in ('loop', 'return', 'one-way', 'any'):
+            with patch('builtins.input', side_effect=['exploring', '70', 'waterfalls',
+                       'moderate', 'yes', '2', route, 'no']), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
+                main.find_walk(trails)
+            self.assertIn('YOUR WALK SUGGESTIONS', out.getvalue())
+
+    def test_sixty_minute_boundary(self):
+        trail = next(t for t in load_catalogue()[1] if t['id'] == 'horseshoe')
+        self.assertTrue(recommend([trail], preferences(max_minutes=60, max_distance=1)))
+        self.assertFalse(recommend([trail], preferences(max_minutes=59)))
+
+
 if __name__ == '__main__':
     unittest.main(
         verbosity=2

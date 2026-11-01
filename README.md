@@ -99,7 +99,9 @@ Mood Match     = 20 points
 Route Match    = 10 points
 ```
 
-Results are sorted by score, then walking time and name. Up to three recommendations are displayed.
+No preference awards the same points to every eligible walk for that factor. Unmatched scenery, mood or route preferences are explained as trade-offs, not exclusions. Results are sorted by descending score, ascending walking time and alphabetical name. Up to three recommendations are displayed.
+
+When no walks fit, the program can offer a longer time while preserving the other limits. It asks before changing the time; users can retry or return to the menu. Saved reports append to earlier sessions.
 
 The score measures preference fit only. It is not a safety rating or confirmation that a track is currently open.
 
@@ -160,4 +162,6 @@ or:
 python3 -m unittest discover -v
 ```
 
-The current version passes 43 automated tests.
+The current version passes 47 automated tests.
+
+The project demonstrates file I/O through CSV loading and report writing, and program testing through standard-library `unittest`. Tests cover ranking, validation, file errors and terminal interactions.

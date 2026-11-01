@@ -53,8 +53,10 @@ def choose(prompt, options, labels=None):
                 label = 'No preference'
             if answer == label.lower():
                 return option
-        if numbered and answer.isdigit() and 1 <= int(answer) <= len(options):
-            return options[int(answer) - 1]
+        if numbered:
+            for index, option in enumerate(options, 1):
+                if answer == str(index):
+                    return option
         print('Please enter one of the listed options.')
 
 
